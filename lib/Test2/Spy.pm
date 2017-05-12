@@ -12,7 +12,7 @@ CHECK {
 
   no warnings 'redefine';
   *App::cpanminus::script::test = sub {
-    my $tmp = tempdir(CLEANUP => 0);
+    my $tmp = tempdir;
     local $ENV{PERL5OPT} = $ENV{PERL5OPT} . " -MTest2::Spy::Bug=$tmp";
     my $ret = $orig->(@_);
     my %out;

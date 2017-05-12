@@ -7,22 +7,15 @@ use Mojo::Base -strict;
 use Test2::Spy::Monitor;
 use Mojo::Server::Daemon;
 
-#use Fcntl qw/F_GETFL F_SETFL FD_CLOEXEC/;
 use POSIX ":sys_wait_h";
 
 my $orig;
 sub test {
   my($self, $cmd, $distname, $depth) = @_;
   my $spy = Test2::Spy::Monitor->new;
-  my $server = Mojo::Server::Daemon->new->app($spy);
+  $spy->log->level('warn');
+  my $server = Mojo::Server::Daemon->new(app => $spy, silent => 1);
   my $port = $server->listen(["http://127.0.0.1"])->start->ports->[0];
-  #unless ($self->WIN32) {
-    #for my $a (@{ $server->acceptors }) {
-      #my $h = $server->ioloop->acceptor($a)->handle;
-      #my $f = fcntl($h, F_GETFL, 0) or die "Can't get flags for the socket: $!\n";
-      #fcntl($h, F_SETFL, $f | FD_CLOEXEC) or die "Can't set flags for the socket: $!\n";
-    #}
-  #}
 
   local $ENV{PERL5OPT} = $ENV{PERL5OPT} . " -MTest2::Spy::Bug=ws://127.0.0.1:$port/";
   our $TIMEOUT;
@@ -47,6 +40,7 @@ sub test {
     } else {
       $pid = fork;
       unless ($pid) {
+        $server->stop;
         $self->run_exec($cmd);
       }
     }
@@ -66,6 +60,7 @@ sub test {
     local $SIG{HUP} = sub { Mojo::IOLoop->stop };
 
     Mojo::IOLoop->start;
+    $server->stop;
     $_ && Mojo::IOLoop->remove($_) for ($rid, $tid);
 
     return 1;
@@ -83,6 +78,7 @@ sub test {
 CHECK {
   $orig = App::cpanminus::script->can('test');
   return unless $orig;
+  no warnings 'redefine';
   *App::cpanminus::script::test = \&test;
 }
 

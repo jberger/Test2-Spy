@@ -1,0 +1,7 @@
+=head1 Test2::Spy
+
+Enable by setting C<-MTest2::Spy> in your C<PERL5OPT> when using L<cpanm>.
+
+  PERL5OPT=-MTest2::Spy cpanm --test-only Data::Printer
+
+L<Test2::Spy> is copyright (c) Joel Berger 2017, it is released under the same terms as Perl 5

@@ -10,18 +10,28 @@ has results => sub { [] };
 sub startup {
   my $app = shift;
 
-  $app->helper(add_event => sub {
-    my ($c, $e) = @_;
-    my $result = $c->stash->{result};
+  $app->helper(result => sub {
+    my $c = shift;
+    my $result = $c->stash->{'spy.result'};
     unless ($result) {
-      $result = $c->stash->{result} = Test2::Harness::Result->new(
-        file => $e->trace->file,
-        name => $e->trace->file,
-        job  => 1,
-      );
-      push @{ $c->app->results }, $result;
+      if (my $file = shift) {
+        $result = $c->stash->{'spy.result'} = Test2::Harness::Result->new(
+          file => $file,
+          name => $file,
+          job  => 1,
+        );
+        push @{ $c->app->results }, $result;
+      } else {
+        die 'Test file not started';
+      }
     }
-    $result->add_event($e);
+    return $result;
+  });
+
+  $app->helper(finalize => sub {
+    my ($c, $exit) = @_;
+    return if $c->stash->{'spy.finalized'}++;
+    $c->result->stop($exit);
   });
 
   $app->helper(format_result => sub {
@@ -32,21 +42,22 @@ sub startup {
     my $duration = $result->stop_time - $result->start_time;
     $duration = sprintf "%.1f", $duration * 10**3;
     my $total = $result->total;
-    return "$name: $state, $total tests (${duration}ms)\n";
+    my $exit = $result->exit;
+    return "$name: $state, ran $total tests in ${duration}ms, exitted $exit\n";
   });
 
   $app->routes->websocket('/' => sub {
     my $c = shift;
     $c->on(json => sub {
       my ($c, $data) = @_;
+      if ($data->{__SPY__}) {
+        $c->finalize($data->{exit}) if exists $data->{exit};
+        return;
+      }
       my $e = Test2::Event->from_json(%$data);
-      $c->add_event($e);
+      $c->result($e->trace->file)->add_event($e);
     });
-    $c->on(finish => sub {
-      my $c = shift;
-      my $result = $c->stash->{result};
-      $result->stop if $result;
-    });
+    $c->on(finish => sub { shift->finalize });
   });
 
 }

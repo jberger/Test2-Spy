@@ -3,7 +3,7 @@ package Test2::Spy::Bug;
 use Mojo::Base -strict;
 
 use Mojo::UserAgent;
-use Test2::API qw/test2_add_callback_post_load test2_stack/;
+use Test2::API qw/test2_add_callback_exit test2_add_callback_post_load test2_stack/;
 
 my $target;
 my $ua = Mojo::UserAgent->new;
@@ -22,7 +22,7 @@ sub ws_send {
       $TX = $tx if $tx;
       die 'Not a websocket' unless $tx->is_websocket;
       $tx->send({json => $data}, $delay->begin);
-    }
+    },
   )->catch(sub{ warn $_[1] })->wait;
 }
 
@@ -37,7 +37,13 @@ sub import {
       my ($hub, $e) = @_;
       ws_send($e);
     }, inherit => 1);
+
+    test2_add_callback_exit(sub{
+      my ($context, $exit, $new_exit) = @_;
+      ws_send({__SPY__ => 1, exit => $$new_exit});
+    });
   });
+
 }
 
 1;

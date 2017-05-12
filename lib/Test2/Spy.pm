@@ -57,8 +57,6 @@ sub test {
       waitpid $pid, 0;
     }) : undef;
 
-    local $SIG{HUP} = sub { Mojo::IOLoop->stop };
-
     Mojo::IOLoop->start;
     $server->stop;
     $_ && Mojo::IOLoop->remove($_) for ($rid, $tid);

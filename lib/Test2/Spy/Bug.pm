@@ -1,33 +1,21 @@
 package Test2::Spy::Bug;
 
-use Mojo::Base -strict;
+use strict;
+use warnings;
 
-use Mojo::UserAgent;
 use Test2::API qw/test2_add_callback_exit test2_add_callback_post_load test2_stack/;
-
-my $target;
-my $ua = Mojo::UserAgent->new;
-my $TX;
-
-sub ws_send {
-  my $data = shift;
-  Mojo::IOLoop->delay(
-    sub {
-      my $delay = shift;
-      return $delay->pass($TX) if $TX;
-      $ua->websocket($target, $delay->begin);
-    },
-    sub {
-      my ($delay, $tx) = @_;
-      $TX = $tx if $tx;
-      die 'Not a websocket' unless $tx->is_websocket;
-      $tx->send({json => $data}, $delay->begin);
-    },
-  )->catch(sub{ warn $_[1] })->wait;
-}
 
 sub import {
   (undef, $target) = @_;
+
+  my $transport;
+  if ($target =~ m[ws(?:s)?://]) {
+    require Test2::Spy::Transport::WebSocket;
+    $transport = Test2::Spy::Transport::WebSocket->new(target => $target);
+    $transport->outfile;
+  } else {
+    die 'target protocol not understood';
+  }
 
   test2_add_callback_post_load(sub{
     my $stack = test2_stack();
@@ -35,12 +23,12 @@ sub import {
 
     $hub->listen(sub{
       my ($hub, $e) = @_;
-      ws_send($e);
+      $transport->write_event($e);
     }, inherit => 1);
 
     test2_add_callback_exit(sub{
       my ($context, $exit, $new_exit) = @_;
-      ws_send({__SPY__ => 1, exit => $$new_exit});
+      $transport->write_event({__SPY__ => 1, exit => $$new_exit});
     });
   });
 

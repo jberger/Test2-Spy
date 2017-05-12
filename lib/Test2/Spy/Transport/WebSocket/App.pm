@@ -1,4 +1,4 @@
-package Test2::Spy::Drop;
+package Test2::Spy::Transport::WebSocket::App;
 
 use Mojo::Base 'Mojolicious';
 

@@ -1,4 +1,4 @@
-package Test2::Spy::Monitor;
+package Test2::Spy::Drop;
 
 use Mojo::Base 'Mojolicious';
 

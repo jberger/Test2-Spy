@@ -4,7 +4,7 @@ BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll' }
 
 use Mojo::Base -strict;
 
-use Test2::Spy::Monitor;
+use Test2::Spy::Drop;
 use Mojo::Server::Daemon;
 
 use POSIX ":sys_wait_h";
@@ -12,9 +12,9 @@ use POSIX ":sys_wait_h";
 my $orig;
 sub test {
   my($self, $cmd, $distname, $depth) = @_;
-  my $spy = Test2::Spy::Monitor->new;
-  $spy->log->level('warn');
-  my $server = Mojo::Server::Daemon->new(app => $spy, silent => 1);
+  my $drop = Test2::Spy::Drop->new;
+  $drop->log->level('warn');
+  my $server = Mojo::Server::Daemon->new(app => $drop, silent => 1);
   my $port = $server->listen(["http://127.0.0.1"])->start->ports->[0];
 
   local $ENV{PERL5OPT} = $ENV{PERL5OPT} . " -MTest2::Spy::Bug=ws://127.0.0.1:$port/";
@@ -68,8 +68,8 @@ sub test {
 
   $orig->(@_);
 
-  my $results = $spy->results;
-  print $spy->format_result($_) for @$results;
+  my $results = $drop->results;
+  print $drop->format_result($_) for @$results;
   print @$results . " tests run\n";
 
   return 1;

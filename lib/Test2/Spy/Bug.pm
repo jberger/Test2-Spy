@@ -2,45 +2,39 @@ package Test2::Spy::Bug;
 
 use Mojo::Base -strict;
 
-use Mojo::UserAgent;
+use Mojo::File 'path';
+use Mojo::JSON 'encode_json';
 use Test2::API qw/test2_add_callback_exit test2_add_callback_post_load test2_stack/;
-
-my $target;
-my $ua = Mojo::UserAgent->new;
-my $TX;
-
-sub ws_send {
-  my $data = shift;
-  Mojo::IOLoop->delay(
-    sub {
-      my $delay = shift;
-      return $delay->pass($TX) if $TX;
-      $ua->websocket($target, $delay->begin);
-    },
-    sub {
-      my ($delay, $tx) = @_;
-      $TX = $tx if $tx;
-      die 'Not a websocket' unless $tx->is_websocket;
-      $tx->send({json => $data}, $delay->begin);
-    },
-  )->catch(sub{ warn $_[1] })->wait;
-}
+use Test2::Harness::Result;
 
 sub import {
-  (undef, $target) = @_;
+  my (undef, $target) = @_;
 
   test2_add_callback_post_load(sub{
     my $stack = test2_stack();
     my $hub = $stack->top;
+    my ($file, $result);
 
     $hub->listen(sub{
       my ($hub, $e) = @_;
-      ws_send($e);
+      $file ||= $e->trace->file;
+      $result ||= Test2::Harness::Result->new(
+        file => $file,
+        name => $file,
+        job => 1,
+      );
+      $result->add_event($e);
     }, inherit => 1);
 
     test2_add_callback_exit(sub{
       my ($context, $exit, $new_exit) = @_;
-      ws_send({__SPY__ => 1, exit => $$new_exit});
+      die 'no result created' unless $result;
+      $result->stop($$new_exit);
+
+      local *Test2::Harness::Result::TO_JSON = Test2::Event->can('TO_JSON') unless Test2::Harness::Result->can('TO_JSON');
+      my $tmp = path($target)->child($file);
+      $tmp->dirname->make_path;
+      $tmp->spurt(encode_json $result);
     });
   });
 

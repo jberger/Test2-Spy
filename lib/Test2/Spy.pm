@@ -4,10 +4,21 @@ BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll' }
 
 use Mojo::Base -strict;
 
-use Test2::Spy::Drop;
+use Mojo::File 'path';
+use Mojo::JSON 'encode_json';
 use Mojo::Server::Daemon;
 
+use Test2::Spy::Drop;
+
 use POSIX ":sys_wait_h";
+
+my $out;
+
+sub import {
+  my ($class, $path) = @_;
+  $path //= 'out.json';
+  $out = path($path)->to_abs;
+}
 
 my $orig;
 sub test {
@@ -69,6 +80,12 @@ sub test {
   my $results = $drop->results;
   print $drop->format_result($_) for @$results;
   print @$results . " tests run\n";
+
+  unless (Test2::Harness::Result->can('TO_JSON')) {
+    *Test2::Harness::Result::TO_JSON = Test2::Event->can('TO_JSON');
+  }
+
+  $out->spurt(encode_json $results);
 
   return 1;
 }
